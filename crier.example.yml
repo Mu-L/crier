@@ -1,7 +1,7 @@
 # Crier presets
 # Location: ~/.config/crier.yml
 
-default_preset: "local"
+default_preset: "local" #optional
 
 # MQTT relay preset
 mybuilds:

@@ -1,6 +1,6 @@
 [package]
 name = "crier"
-version = "0.2.2"
+version = "0.2.3"
 edition = "2021"
 description = "Simple push notification tool"
 
@@ -9,4 +9,4 @@ clap = { version = "4", features = ["derive"] }
 rumqttc = "0.25"
 serde = { version = "1", features = ["derive"] }
 serde_yaml = "0.9"
-dirs = "5"
+dirs = "6"
