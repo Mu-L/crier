@@ -1,6 +1,8 @@
 # Crier presets
 # Location: ~/.config/crier.yml
 
+default_preset: "local"
+
 # MQTT relay preset
 mybuilds:
   relay: test.mosquitto.org

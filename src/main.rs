@@ -106,6 +106,7 @@ struct Preset {
 struct Config {
     #[serde(flatten)]
     presets: HashMap<String, Preset>,
+    default_preset: Option<String>,
 }
 
 fn config_path(custom: Option<&PathBuf>) -> PathBuf {
@@ -131,9 +132,19 @@ fn load_config(custom_path: Option<&PathBuf>) -> Config {
 fn get_preset(name: &str, custom_path: Option<&PathBuf>) -> Preset {
     let config = load_config(custom_path);
     let path = config_path(custom_path);
-    config.presets.get(name).cloned().unwrap_or_else(|| {
-        eprintln!("Error: Preset '{}' not found in {:?}", name, path);
-        eprintln!("Available presets: {:?}", config.presets.keys().collect::<Vec<_>>());
+
+    let preset_name = if name.is_empty() {
+        config.default_preset.as_deref().unwrap_or("local")
+    } else {
+        name
+    };
+
+    config.presets.get(preset_name).cloned().unwrap_or_else(|| {
+        eprintln!("Error: Preset '{}' not found in {:?}", preset_name, path);
+        eprintln!(
+            "Available presets: {:?}",
+            config.presets.keys().collect::<Vec<_>>()
+        );
         std::process::exit(1);
     })
 }
@@ -161,7 +172,7 @@ fn print_examples() {
 
 fn main() {
     let args = Args::parse();
-    
+
     // Show examples if requested
     if args.examples {
         print_examples();
@@ -177,14 +188,29 @@ fn main() {
     });
 
     match command {
-        Commands::Listen { preset, addr, relay, port, topic, message, auth } => {
+        Commands::Listen {
+            preset,
+            addr,
+            relay,
+            port,
+            topic,
+            message,
+            auth,
+        } => {
             // Load preset if specified
-            let p = preset.as_ref().map(|n| get_preset(n, config_path)).unwrap_or_default();
-            
+            let p = preset
+                .as_ref()
+                .map(|n| get_preset(n, config_path))
+                .unwrap_or_else(|| get_preset("", config_path));
+
             // CLI overrides preset
             let addr = addr.or(p.addr);
             let relay = relay.or(p.relay);
-            let port = if port != 1883 { port } else { p.port.unwrap_or(1883) };
+            let port = if port != 1883 {
+                port
+            } else {
+                p.port.unwrap_or(1883)
+            };
             let topic = topic.or(p.topic);
             let message = message.or(p.message);
             let auth = auth.or(p.auth);
@@ -207,14 +233,29 @@ fn main() {
                 std::process::exit(1);
             }
         }
-        Commands::Send { preset, addr, relay, port, topic, message, auth } => {
+        Commands::Send {
+            preset,
+            addr,
+            relay,
+            port,
+            topic,
+            message,
+            auth,
+        } => {
             // Load preset if specified
-            let p = preset.as_ref().map(|n| get_preset(n, config_path)).unwrap_or_default();
-            
+            let p = preset
+                .as_ref()
+                .map(|n| get_preset(n, config_path))
+                .unwrap_or_else(|| get_preset("", config_path));
+
             // CLI overrides preset
             let addr = addr.or(p.addr);
             let relay = relay.or(p.relay);
-            let port = if port != 1883 { port } else { p.port.unwrap_or(1883) };
+            let port = if port != 1883 {
+                port
+            } else {
+                p.port.unwrap_or(1883)
+            };
             let topic = topic.or(p.topic);
             let message = message.or(p.message);
             let auth = auth.or(p.auth);
@@ -260,7 +301,7 @@ fn relay_listen(broker: &str, port: u16, topic: &str, cmd_template: &str, auth: 
     for event in connection.iter().flatten() {
         if let Event::Incoming(Packet::Publish(msg)) = event {
             let payload = String::from_utf8_lossy(&msg.payload);
-            
+
             // Check auth if required
             let message = if let Some(expected) = auth {
                 if let Some(stripped) = payload.strip_prefix(&format!("AUTH:{}:", expected)) {
@@ -272,7 +313,7 @@ fn relay_listen(broker: &str, port: u16, topic: &str, cmd_template: &str, auth: 
             } else {
                 payload.to_string()
             };
-            
+
             println!("Received: {}", message);
             let cmd = cmd_template.replace("{}", &message);
             run_command(&cmd);
@@ -299,7 +340,7 @@ fn relay_send(broker: &str, port: u16, topic: &str, message: &str, auth: Option<
     // Poll connection briefly to actually send the message
     let start = std::time::Instant::now();
     let timeout = Duration::from_secs(5);
-    
+
     for event in connection.iter() {
         if start.elapsed() > timeout {
             eprintln!("Timeout waiting for broker");
@@ -340,7 +381,10 @@ fn direct_listen(addr: &str, cmd_template: &str, auth: Option<&str>) {
     for stream in listener.incoming() {
         match stream {
             Ok(mut stream) => {
-                let peer = stream.peer_addr().map(|a| a.to_string()).unwrap_or_default();
+                let peer = stream
+                    .peer_addr()
+                    .map(|a| a.to_string())
+                    .unwrap_or_default();
 
                 let reader = BufReader::new(&stream);
                 let mut lines = reader.lines();
